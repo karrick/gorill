@@ -2,6 +2,11 @@
 
 Small Go library for various stream wrappers.  A rill is a small stream.
 
+### Usage
+
+Documentation is available via
+[![GoDoc](https://godoc.org/github.com/karrick/gorill?status.svg)](https://godoc.org/github.com/karrick/gorill).
+
 ### Description
 
 One of the strengths of Go's interface system is that it allows easy composability of data types.
