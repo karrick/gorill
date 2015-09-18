@@ -88,7 +88,7 @@ func (nlmw *NonLockingMultiWriteCloser) Write(data []byte) (int, error) {
 	if len(errored) > 0 {
 		for _, w := range errored {
 			delete(nlmw.writers, w)
-			w.Close()
+			w.Close() // ignore Close error, because writer already yielded error
 		}
 		nlmw.update()
 	}
@@ -111,7 +111,7 @@ func (nlmw *NonLockingMultiWriteCloser) WriteSeries(data []byte) (int, error) {
 	if len(errored) > 0 {
 		for _, w := range errored {
 			delete(nlmw.writers, w)
-			w.Close()
+			w.Close() // ignore Close error, because writer already yielded error
 		}
 		nlmw.update()
 	}

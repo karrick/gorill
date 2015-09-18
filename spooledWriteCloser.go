@@ -68,6 +68,8 @@ func NewSpooledWriteCloser(iowc io.WriteCloser, setters ...SpooledWriteCloserSet
 	w.bw = bufio.NewWriterSize(iowc, w.bufferSize)
 	w.jobsDone.Add(1)
 	go func() {
+		ticker := time.NewTicker(w.flushPeriod)
+		defer ticker.Stop()
 		defer w.jobsDone.Done()
 		for {
 			select {
@@ -79,7 +81,7 @@ func NewSpooledWriteCloser(iowc io.WriteCloser, setters ...SpooledWriteCloserSet
 				n, err := w.bw.Write(job.data)
 				w.bwLock.Unlock()
 				job.results <- writeResult{n, err}
-			case <-time.After(w.flushPeriod):
+			case <-ticker.C:
 				w.Flush()
 			}
 		}
