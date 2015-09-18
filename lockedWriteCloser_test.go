@@ -1,7 +1,6 @@
 package gorill
 
 import (
-	"bytes"
 	"io"
 	"testing"
 )
@@ -9,7 +8,7 @@ import (
 func BenchmarkWriterLockedWriter(b *testing.B) {
 	consumers := make([]io.WriteCloser, consumerCount)
 	for i := 0; i < len(consumers); i++ {
-		consumers[i] = NopCloseWriter(NewLockingWriter(new(bytes.Buffer)))
+		consumers[i] = NewLockingWriteCloser(NewNopCloseBuffer())
 	}
 	benchmarkWriter(b, b.N, consumers)
 }

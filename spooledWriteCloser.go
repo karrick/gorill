@@ -8,10 +8,11 @@ import (
 	"time"
 )
 
-const (
-	defaultFlushPeriod = time.Minute
-	defaultBufSize     = 4096 // it's what bufio.Writer uses by default
-)
+// DefaultBufSize is the default size of the underlying bufio.Writer buffer.
+const DefaultBufSize = 4096
+
+// DefaultFlushPeriod is the default frequency of buffer flushes.
+const DefaultFlushPeriod = 15 * time.Second
 
 // SpooledWriteCloser spools bytes written to it through a bufio.Writer, periodically flushing data
 // written to underlying io.WriteCloser.
@@ -55,8 +56,8 @@ func BufSize(size int) SpooledWriteCloserSetter {
 // bufio.Writer, periodically forcing the bufio.Writer to flush its contents.
 func NewSpooledWriteCloser(iowc io.WriteCloser, setters ...SpooledWriteCloserSetter) (*SpooledWriteCloser, error) {
 	w := &SpooledWriteCloser{
-		bufferSize:  defaultBufSize,
-		flushPeriod: defaultFlushPeriod,
+		bufferSize:  DefaultBufSize,
+		flushPeriod: DefaultFlushPeriod,
 		iowc:        iowc,
 		jobs:        make(chan writeJob, 1), // buffered to support non-blocking send
 	}

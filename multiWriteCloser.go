@@ -26,6 +26,23 @@ type NonLockingMultiWriteCloser struct {
 
 // NewMultiWriteCloser returns a non-locking multiwriter that is not co-routine safe. It is useful when
 // used in a data structure that itself uses locking to prevent race conditions.
+//
+//   bb1 = gorill.NewNopCloseBuffer()
+//   bb2 = gorill.NewNopCloseBuffer()
+//   mw = gorill.NewMultiWriteCloser(bb1, bb2)
+//   n, err := mw.Write([]byte("blob"))
+//   if want := 4; n != want {
+//   	t.Errorf("Actual: %#v; Expected: %#v", n, want)
+//   }
+//   if err != nil {
+//   	t.Errorf("Actual: %#v; Expected: %#v", err, nil)
+//   }
+//   if want := "blob"; bb1.String() != want {
+//   	t.Errorf("Actual: %#v; Expected: %#v", bb1.String(), want)
+//   }
+//   if want := "blob"; bb2.String() != want {
+//   	t.Errorf("Actual: %#v; Expected: %#v", bb2.String(), want)
+//   }
 func NewMultiWriteCloser(writers ...io.WriteCloser) MultiWriteCloser {
 	nlmw := &NonLockingMultiWriteCloser{writers: make(map[io.WriteCloser]struct{})}
 	for _, w := range writers {
@@ -44,18 +61,33 @@ func (nlmw *NonLockingMultiWriteCloser) update() {
 
 // Add adds an io.WriteCloser to the list of writers to be written to whenever this MultiWriteCloser is
 // written to.
+//
+//   bb1 = gorill.NewNopCloseBuffer()
+//   mw = gorill.NewMultiWriteCloser(bb1)
+//   bb2 = gorill.NewNopCloseBuffer()
+//   mw.Add(bb2)
 func (nlmw *NonLockingMultiWriteCloser) Add(w io.WriteCloser) {
 	nlmw.writers[w] = struct{}{}
 	nlmw.update()
 }
 
 // IsEmpty returns true if and only if there are no writers in the list of writers to be written to.
+//
+//   mw = gorill.NewMultiWriteCloser()
+//   mw.IsEmpty() // returns true
+//   mw.Add(gorill.NewNopCloseBuffer())
+//   mw.IsEmpty() // returns false
 func (nlmw *NonLockingMultiWriteCloser) IsEmpty() bool {
 	return len(nlmw.iows) == 0
 }
 
 // Remove removes an io.WriteCloser from the list of writers to be written to whenever this MultiWriteCloser
 // is written to.
+//
+//   bb1 = gorill.NewNopCloseBuffer()
+//   bb2 = gorill.NewNopCloseBuffer()
+//   mw = gorill.NewMultiWriteCloser(bb1, bb2)
+//   mw.Remove(bb1)
 func (nlmw *NonLockingMultiWriteCloser) Remove(w io.WriteCloser) {
 	delete(nlmw.writers, w)
 	nlmw.update()
@@ -63,6 +95,17 @@ func (nlmw *NonLockingMultiWriteCloser) Remove(w io.WriteCloser) {
 
 // Write writes the data to all the writers in the MultiWriteCloser.  It removes and invokes Close
 // method for all io.WriteClosers that returns an error when written to.
+//
+//   bb1 = gorill.NewNopCloseBuffer()
+//   bb2 = gorill.NewNopCloseBuffer()
+//   mw = gorill.NewMultiWriteCloser(bb1, bb2)
+//   n, err := mw.Write([]byte("blob"))
+//   if want := 4; n != want {
+//   	t.Errorf("Actual: %#v; Expected: %#v", n, want)
+//   }
+//   if err != nil {
+//   	t.Errorf("Actual: %#v; Expected: %#v", err, nil)
+//   }
 func (nlmw *NonLockingMultiWriteCloser) Write(data []byte) (int, error) {
 	// NOTE: the complexity of wait group and go routines does not
 	// solve the slow writer problem, but it helps
@@ -128,13 +171,35 @@ type LockingMultiWriteCloser struct {
 
 // NewLockingMultiWriteCloser returns a multiwriter that is co-routine safe. It is useful when used in a
 // data structure that may or may not provide its own locking mechanism.
+//
+//   bb1 = gorill.NewNopCloseBuffer()
+//   bb2 = gorill.NewNopCloseBuffer()
+//   mw = gorill.NewLockingMultiWriteCloser(bb1, bb2)
+//   n, err := mw.Write([]byte("blob"))
+//   if want := 4; n != want {
+//   	t.Errorf("Actual: %#v; Expected: %#v", n, want)
+//   }
+//   if err != nil {
+//   	t.Errorf("Actual: %#v; Expected: %#v", err, nil)
+//   }
+//   if want := "blob"; bb1.String() != want {
+//   	t.Errorf("Actual: %#v; Expected: %#v", bb1.String(), want)
+//   }
+//   if want := "blob"; bb2.String() != want {
+//   	t.Errorf("Actual: %#v; Expected: %#v", bb2.String(), want)
+//   }
 func NewLockingMultiWriteCloser(writers ...io.WriteCloser) MultiWriteCloser {
 	foo := NewMultiWriteCloser(writers...)
 	return &LockingMultiWriteCloser{nlmw: foo.(*NonLockingMultiWriteCloser)}
 }
 
-// Add adds an io.WriteCloser to the list of writers to be written to whenever this MultiWriteCloser is
-// written to.
+// Add adds an io.WriteCloser to the list of writers to be written to whenever this MultiWriteCloser
+// is written to.
+//
+//   bb1 = gorill.NewNopCloseBuffer()
+//   mw = gorill.NewLockingMultiWriteCloser(bb1)
+//   bb2 = gorill.NewNopCloseBuffer()
+//   mw.Add(bb2)
 func (mw *LockingMultiWriteCloser) Add(w io.WriteCloser) {
 	mw.lock.Lock()
 	defer mw.lock.Unlock()
@@ -142,6 +207,10 @@ func (mw *LockingMultiWriteCloser) Add(w io.WriteCloser) {
 }
 
 // IsEmpty returns true if and only if there are no writers in the list of writers to be written to.
+//   mw = gorill.NewLockingMultiWriteCloser()
+//   mw.IsEmpty() // returns true
+//   mw.Add(gorill.NewNopCloseBuffer())
+//   mw.IsEmpty() // returns false
 func (mw *LockingMultiWriteCloser) IsEmpty() bool {
 	mw.lock.RLock()
 	defer mw.lock.RUnlock()
@@ -150,6 +219,11 @@ func (mw *LockingMultiWriteCloser) IsEmpty() bool {
 
 // Remove removes an io.WriteCloser from the list of writers to be written to whenever this MultiWriteCloser
 // is written to.
+//
+//   bb1 = gorill.NewNopCloseBuffer()
+//   bb2 = gorill.NewNopCloseBuffer()
+//   mw = gorill.NewLockingMultiWriteCloser(bb1, bb2)
+//   mw.Remove(bb1)
 func (mw *LockingMultiWriteCloser) Remove(w io.WriteCloser) {
 	mw.lock.Lock()
 	defer mw.lock.Unlock()
@@ -157,6 +231,17 @@ func (mw *LockingMultiWriteCloser) Remove(w io.WriteCloser) {
 }
 
 // Write writes the data to all the writers in the MultiWriteCloser.
+//
+//   bb1 = gorill.NewNopCloseBuffer()
+//   bb2 = gorill.NewNopCloseBuffer()
+//   mw = gorill.NewLockingMultiWriteCloser(bb1, bb2)
+//   n, err := mw.Write([]byte("blob"))
+//   if want := 4; n != want {
+//   	t.Errorf("Actual: %#v; Expected: %#v", n, want)
+//   }
+//   if err != nil {
+//   	t.Errorf("Actual: %#v; Expected: %#v", err, nil)
+//   }
 func (mw *LockingMultiWriteCloser) Write(data []byte) (int, error) {
 	mw.lock.RLock()
 	defer mw.lock.RUnlock()

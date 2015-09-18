@@ -5,24 +5,6 @@ import (
 	"sync"
 )
 
-// LockingWriter is a io.Writer that allows only exclusive access to Write method.
-type LockingWriter struct {
-	lock sync.Mutex
-	iow  io.Writer
-}
-
-// NewLockingWriter returns a LockingWriter, that allows only exclusive access to Write method.
-func NewLockingWriter(iow io.Writer) *LockingWriter {
-	return &LockingWriter{iow: iow}
-}
-
-// Write writes data to the underlying io.Writer.
-func (lw *LockingWriter) Write(data []byte) (int, error) {
-	lw.lock.Lock()
-	defer lw.lock.Unlock()
-	return lw.iow.Write(data)
-}
-
 // LockingWriteCloser is an io.WriteCloser that allows only exclusive access to its Write and Close
 // method.
 type LockingWriteCloser struct {
@@ -32,6 +14,18 @@ type LockingWriteCloser struct {
 
 // NewLockingWriteCloser returns a LockingWriteCloser, that allows only exclusive access to its
 // Write and Close method.
+//
+//   lwc := gorill.NewLockingWriteCloser(os.Stdout)
+//   for i := 0; i < 1000; i++ {
+//       go func(iow io.Writer, i int) {
+//           for j := 0; j < 100; j++ {
+//               _, err := iow.Write([]byte("Hello, World, from %d!\n", i))
+//               if err != nil {
+//                   return
+//               }
+//           }
+//       }(lwc, i)
+//   }
 func NewLockingWriteCloser(iowc io.WriteCloser) *LockingWriteCloser {
 	return &LockingWriteCloser{iowc: iowc}
 }
