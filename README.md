@@ -30,6 +30,9 @@ If a program has an `io.Writer` but requires an `io.WriteCloser`, the program ca
     iowc.Close() // does nothing
 ```
 
+Alternatively, if you already have an `io.WriteCloser`, but you want its `Close` method to do
+nothing, then wrap it in a `NopCloseWriter`.
+
 ##### NopReadCloser
 
 If a program has an `io.Reader` but requires an `io.ReadCloser`, the program can imbue the
@@ -42,6 +45,9 @@ symmetry with the `NopCloseWriter` call above.
     iorc := gorill.NopCloseReader(ior)
     iorc.Close() // does nothing
 ```
+
+Alternatively, if you already have an `io.ReadCloser`, but you want its `Close` method to do
+nothing, then wrap it in a `NopCloseReader`.
 
 ##### SpooledWriteCloser
 
