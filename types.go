@@ -79,6 +79,10 @@ func NewNopCloseBuffer() *NopCloseBuffer {
 	return &NopCloseBuffer{Buffer: new(bytes.Buffer), closed: false}
 }
 
+func NewNopCloseBufferSize(size int) *NopCloseBuffer {
+	return &NopCloseBuffer{Buffer: bytes.NewBuffer(make([]byte, 0, size)), closed: false}
+}
+
 ////////////////////////////////////////
 
 type shortWriter struct {
