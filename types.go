@@ -79,6 +79,8 @@ func NewNopCloseBuffer() *NopCloseBuffer {
 	return &NopCloseBuffer{Buffer: new(bytes.Buffer), closed: false}
 }
 
+// NewNopCloseBufferSize returns a structure that wraps bytes.Buffer with a no-op Close method,
+// using a specified buffer size.  It can be used in tests that need a bytes.Buffer.
 func NewNopCloseBufferSize(size int) *NopCloseBuffer {
 	return &NopCloseBuffer{Buffer: bytes.NewBuffer(make([]byte, 0, size)), closed: false}
 }
