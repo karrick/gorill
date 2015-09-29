@@ -20,7 +20,7 @@ func init() {
 	newBuf := func(size int) []byte {
 		buf := make([]byte, size)
 		for i := range buf {
-			buf[i] = '.'
+			buf[i] = byte(i % 256)
 		}
 		return buf
 	}
@@ -30,7 +30,7 @@ func init() {
 
 func TestFlushForcesBytesWritten(t *testing.T) {
 	test := func(buf []byte, flushPeriodicity time.Duration) {
-		bb := bytes.NewBufferString("")
+		bb := new(bytes.Buffer)
 
 		SlowWriter := SlowWriter(bb, 10*time.Millisecond)
 		spoolWriter, _ := NewSpooledWriteCloser(NopCloseWriter(SlowWriter), Flush(flushPeriodicity))
