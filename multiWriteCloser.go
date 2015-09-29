@@ -9,6 +9,7 @@ import (
 // io.WriteCloser objects that will be written to.
 type MultiWriteCloser interface {
 	Add(io.WriteCloser)
+	Close() error
 	IsEmpty() bool
 	Remove(io.WriteCloser)
 	Write([]byte) (int, error)
@@ -69,6 +70,15 @@ func (nlmw *NonLockingMultiWriteCloser) update() {
 func (nlmw *NonLockingMultiWriteCloser) Add(w io.WriteCloser) {
 	nlmw.writers[w] = struct{}{}
 	nlmw.update()
+}
+
+// Close will close the underlying io.WriteCloser, and releases resources.
+func (nlmw *NonLockingMultiWriteCloser) Close() error {
+	var errors ErrList
+	for _, iowc := range nlmw.iows {
+		errors.Append(iowc.Close())
+	}
+	return errors.Err()
 }
 
 // IsEmpty returns true if and only if there are no writers in the list of writers to be written to.
@@ -204,6 +214,13 @@ func (mw *LockingMultiWriteCloser) Add(w io.WriteCloser) {
 	mw.lock.Lock()
 	defer mw.lock.Unlock()
 	mw.nlmw.Add(w)
+}
+
+// Close will close the underlying io.WriteCloser, and releases resources.
+func (mw *LockingMultiWriteCloser) Close() error {
+	mw.lock.Lock()
+	defer mw.lock.Unlock()
+	return mw.nlmw.Close()
 }
 
 // IsEmpty returns true if and only if there are no writers in the list of writers to be written to.

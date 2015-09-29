@@ -19,6 +19,7 @@ func TestMultiWriteCloserNoWriteClosers(t *testing.T) {
 		if err != nil {
 			t.Errorf("Actual: %#v; Expected: %#v", err, nil)
 		}
+		mw.Close()
 	}
 
 	test(t, "non-locking", NewMultiWriteCloser())
@@ -43,6 +44,7 @@ func TestMultiWriteCloserNewWriteCloser(t *testing.T) {
 		if want := "blob"; bb2.String() != want {
 			t.Errorf("Actual: %#v; Expected: %#v", bb2.String(), want)
 		}
+		mw.Close()
 	}
 
 	bb1 := NewNopCloseBuffer()
@@ -73,6 +75,7 @@ func TestMultiWriteCloserOneWriteCloser(t *testing.T) {
 		if want := "blob"; bb1.String() != want {
 			t.Errorf("Actual: %#v; Expected: %#v", bb1.String(), want)
 		}
+		mw.Close()
 	}
 
 	test(t, "non-locking", NewMultiWriteCloser())
@@ -101,6 +104,7 @@ func TestMultiWriteCloserTwoWriteClosers(t *testing.T) {
 		if want := "blob"; bb2.String() != want {
 			t.Errorf("Actual: %#v; Expected: %#v", bb2.String(), want)
 		}
+		mw.Close()
 	}
 
 	test(t, "non-locking", NewMultiWriteCloser())
@@ -130,6 +134,7 @@ func TestMultiWriteCloserRemoveWriteCloser(t *testing.T) {
 		if want := "blob"; bb2.String() != want {
 			t.Errorf("Actual: %#v; Expected: %#v", bb2.String(), want)
 		}
+		mw.Close()
 	}
 
 	test(t, "non-locking", NewMultiWriteCloser())
@@ -160,6 +165,7 @@ func TestMultiWriteCloserRemoveEveryWriteCloser(t *testing.T) {
 		if want := ""; bb2.String() != want {
 			t.Errorf("Actual: %#v; Expected: %#v", bb2.String(), want)
 		}
+		mw.Close()
 	}
 
 	test(t, "non-locking", NewMultiWriteCloser())
@@ -211,6 +217,7 @@ func TestMultiWriteCloserWriteErrorRemovesBadWriteCloser(t *testing.T) {
 		if want := true; mw.IsEmpty() != want {
 			t.Errorf("Actual: %#v; Expected: %#v", mw.IsEmpty(), want)
 		}
+		mw.Close()
 	}
 
 	test(t, "non-locking", NewMultiWriteCloser())
@@ -232,6 +239,7 @@ func BenchmarkMultiWriteCloserWrite(b *testing.B) {
 	if err != nil {
 		b.Errorf("Actual: %#v; Expected: %#v", err, nil)
 	}
+	mw.Close()
 }
 
 func BenchmarkMultiWriteCloserWriteSeries(b *testing.B) {
@@ -246,6 +254,7 @@ func BenchmarkMultiWriteCloserWriteSeries(b *testing.B) {
 	if err != nil {
 		b.Errorf("Actual: %#v; Expected: %#v", err, nil)
 	}
+	mw.Close()
 }
 
 func BenchmarkMultiWriteCloserWriteSlow(b *testing.B) {
@@ -260,6 +269,7 @@ func BenchmarkMultiWriteCloserWriteSlow(b *testing.B) {
 	if err != nil {
 		b.Errorf("Actual: %#v; Expected: %#v", err, nil)
 	}
+	mw.Close()
 }
 
 func BenchmarkMultiWriteCloserWriteSeriesSlow(b *testing.B) {
@@ -274,4 +284,5 @@ func BenchmarkMultiWriteCloserWriteSeriesSlow(b *testing.B) {
 	if err != nil {
 		b.Errorf("Actual: %#v; Expected: %#v", err, nil)
 	}
+	mw.Close()
 }
