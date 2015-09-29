@@ -2,12 +2,16 @@
 
 package gorill
 
-import "testing"
+import (
+	"io"
+	"testing"
+	"time"
+)
 
 func TestDemux(t *testing.T) {
 	bb := NewNopCloseBufferSize(16384)
 
-	first := NewDemux(bb)
+	first := NewWriteCloseDuper(bb)
 
 	want := string(largeBuf)
 	first.Write(largeBuf)
@@ -36,7 +40,16 @@ func TestDemux(t *testing.T) {
 	}
 
 	second.Close()
+	time.Sleep(100 * time.Millisecond) // race condition during testing
 	if want, actual := true, bb.IsClosed(); actual != want {
 		t.Errorf("Actual: %#v; Expected: %#v", actual, want)
 	}
+}
+
+func BenchmarkWriterWriteCloseDumper(b *testing.B) {
+	consumers := make([]io.WriteCloser, consumerCount)
+	for i := 0; i < len(consumers); i++ {
+		consumers[i] = NewWriteCloseDuper(NewNopCloseBuffer())
+	}
+	benchmarkWriter(b, b.N, consumers)
 }
