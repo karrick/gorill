@@ -60,10 +60,14 @@ type writeResult struct {
 // NopCloseBuffer is a structure that wraps a buffer, but also provides a no-op Close method.
 type NopCloseBuffer struct {
 	*bytes.Buffer
+	closed bool
 }
 
 // Close returns nil error.
-func (NopCloseBuffer) Close() error { return nil }
+func (m *NopCloseBuffer) Close() error { m.closed = true; return nil }
+
+// IsClosed returns false, unless NopCloseBuffer's Close method has been invoked
+func (m *NopCloseBuffer) IsClosed() bool { return m.closed }
 
 // NewNopCloseBuffer returns a structure that wraps bytes.Buffer with a no-op Close method.  It can
 // be used in tests that need a bytes.Buffer.
@@ -72,7 +76,7 @@ func (NopCloseBuffer) Close() error { return nil }
 //   bb.Write([]byte("example"))
 //   bb.Close() // does nothing
 func NewNopCloseBuffer() *NopCloseBuffer {
-	return &NopCloseBuffer{new(bytes.Buffer)}
+	return &NopCloseBuffer{Buffer: new(bytes.Buffer), closed: false}
 }
 
 ////////////////////////////////////////
