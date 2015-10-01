@@ -6,18 +6,6 @@ import "strings"
 // independent errors to return.
 type ErrList []error
 
-// Error returns the string version of an error list, which is the list of errors, joined by a
-// comma-space byte sequence.
-func (e ErrList) Error() string {
-	es := make([]string, len([]error(e)))
-	for i := range []error(e) {
-		if []error(e)[i] != nil {
-			es[i] = []error(e)[i].Error()
-		}
-	}
-	return strings.Join(es, ", ")
-}
-
 // Append appends non-nil errors to the list of errors.
 func (e *ErrList) Append(b error) {
 	if b != nil {
@@ -42,4 +30,16 @@ func (e ErrList) Err() error {
 	default:
 		return ErrList(errors)
 	}
+}
+
+// Error returns the string version of an error list, which is the list of errors, joined by a
+// comma-space byte sequence.
+func (e ErrList) Error() string {
+	es := make([]string, 0, len([]error(e)))
+	for i := range []error(e) {
+		if []error(e)[i] != nil {
+			es = append(es, []error(e)[i].Error())
+		}
+	}
+	return strings.Join(es, ", ")
 }
