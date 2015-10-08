@@ -16,7 +16,7 @@ func (e *ErrList) Append(b error) {
 // Err returns either a list of non-nil error values, or a single error value if the list only
 // contains one error.
 func (e ErrList) Err() error {
-	errors := make([]error, len([]error(e)))
+	errors := make([]error, 0, len([]error(e)))
 	for _, e := range []error(e) {
 		if e != nil {
 			errors = append(errors, e)
