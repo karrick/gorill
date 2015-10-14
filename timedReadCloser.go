@@ -30,7 +30,7 @@ func NewTimedReadCloser(iowc io.ReadCloser, timeout time.Duration) *TimedReadClo
 	r.jobsDone.Add(1)
 	go func() {
 		for job := range r.jobs {
-			n, err := r.iorc.Read(job.data)
+			n, err := r.iorc.Read(*job.data)
 			job.results <- readResult{n, err}
 		}
 		r.jobsDone.Done()
@@ -48,7 +48,7 @@ func (w *TimedReadCloser) Read(data []byte) (int, error) {
 	results := make(chan readResult, 1)
 	// non-blocking send
 	select {
-	case w.jobs <- readJob{data: data, results: results}:
+	case w.jobs <- readJob{data: &data, results: results}:
 	default:
 	}
 	// wait for result or timeout

@@ -13,7 +13,7 @@ type ErrTimeout time.Duration
 
 // Error returns a string representing the ErrTimeout.
 func (e ErrTimeout) Error() string {
-	return fmt.Sprintf("write timeout after %s", time.Duration(e))
+	return fmt.Sprintf("timeout after %s", time.Duration(e))
 }
 
 // TimedWriteCloser is an io.Writer that enforces a preset timeout period on every Write operation.

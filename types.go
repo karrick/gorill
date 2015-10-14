@@ -1,7 +1,7 @@
 package gorill
 
 type readJob struct {
-	data    []byte
+	data    *[]byte
 	results chan readResult
 }
 
