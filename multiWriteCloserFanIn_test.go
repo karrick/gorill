@@ -8,10 +8,10 @@ import (
 	"time"
 )
 
-func TestDemux(t *testing.T) {
+func TestMultiWriteCloserFanIn(t *testing.T) {
 	bb := NewNopCloseBufferSize(16384)
 
-	first := NewWriteCloseDuper(bb)
+	first := NewMultiWriteCloserFanIn(bb)
 
 	want := string(largeBuf)
 	first.Write(largeBuf)
@@ -26,7 +26,7 @@ func TestDemux(t *testing.T) {
 		t.Errorf("Actual: %#v; Expected: %#v", actual, want)
 	}
 
-	second := first.Dup()
+	second := first.Add()
 	want = string(largeBuf)
 	second.Write(largeBuf)
 
@@ -46,10 +46,10 @@ func TestDemux(t *testing.T) {
 	}
 }
 
-func BenchmarkWriterWriteCloseDumper(b *testing.B) {
+func BenchmarkWriterMultiWriteCloserFanIn(b *testing.B) {
 	consumers := make([]io.WriteCloser, consumerCount)
 	for i := 0; i < len(consumers); i++ {
-		consumers[i] = NewWriteCloseDuper(NewNopCloseBuffer())
+		consumers[i] = NewMultiWriteCloserFanIn(NewNopCloseBuffer())
 	}
 	benchmarkWriter(b, b.N, consumers)
 }
