@@ -23,6 +23,16 @@ type MultiWriteCloserFanIn struct {
 // io.WriteCloser instances will be funneled to the underlying io.WriteCloser instance.  The client
 // ought to call Close on all provided io.WriteCloser instances, after which, MultiWriteCloserFanIn will
 // close the underlying io.WriteCloser.
+//
+//    func Example(largeBuf []byte) {
+//    	bb := NewNopCloseBufferSize(16384)
+//    	first := NewMultiWriteCloserFanIn(bb)
+//    	second := first.Add()
+//    	first.Write(largeBuf)
+//    	first.Close()
+//    	second.Write(largeBuf)
+//    	second.Close()
+//    }
 func NewMultiWriteCloserFanIn(iowc io.WriteCloser) *MultiWriteCloserFanIn {
 	var lock sync.Mutex
 	var done sync.WaitGroup

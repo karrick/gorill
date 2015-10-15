@@ -1,6 +1,6 @@
 # gorill
 
-Small Go library for various stream wrappers.  A rill is a small stream.
+Small Go library for various stream wrappers.  A 'rill' is a small stream.
 
 ### Usage
 
@@ -84,6 +84,25 @@ achieve the required functionality:
     }
 ```
 
+##### TimedReadCloser
+
+If a program has an `io.Reader` but requires one that has a built in timeout for reads, one can
+wrap the original `io.Reader`, but modify the `Read` method to provide the required timeout
+handling.  The new data structure can be used anywhere the original `io.Reader` was used, and
+seemlessly handles reads that take too long.
+
+```Go
+    timed := gorill.NewTimedReadCloser(iowc, 10*time.Second)
+    buf := make([]byte, 1000)
+    n, err := timed.Read(buf)
+    if err != nil {
+        if terr, ok := err.(gorill.ErrTimeout); ok {
+            // timeout occurred
+        }
+        return err
+    }
+```
+
 ##### TimedWriteCloser
 
 If a program has an `io.Writer` but requires one that has a built in timeout for writes, one can
@@ -122,21 +141,32 @@ than channels for this case.  `LockingWriteCloser` data structures provide this 
     }
 ```
 
-##### MultiWriteCloser
+##### MultiWriteCloserFanIn
+
+If a program needs to be able to fan in writes from multiple `io.WriteCloser`s to a single
+`io.WriteCloser`, the program can use a `MultiWriteCloserFanIn`.
+
+```Go
+    func Example(largeBuf []byte) {
+    	bb := NewNopCloseBuffer()
+    	first := NewMultiWriteCloserFanIn(bb)
+    	second := first.Add()
+    	first.Write(largeBuf)
+    	first.Close()
+    	second.Write(largeBuf)
+    	second.Close()
+    }
+```
+
+##### MultiWriteCloserFanOut
 
 If a program needs to be able to fan out writes to multiple `io.WriteCloser`s, the program can use a
-`MultiWriteCloser`.  Two data structures provide the `MultiWriteCloser` interface:
-`LockingMultiWriteCloser` and `NonLockingMultiWriteCloser`.
-
-`LockingMultiWriteCloser` is go-routine safe, while `NonLockingMultiWriteCloser` is provided when
-the slight performance penalty of locking is not needed, for instance either in a program that will
-not call its methods from multiple go-routines concurrently, or a program that provides its own
-locking.
+`MultiWriteCloserFanOut`.
 
 ```Go
 	bb1 = gorill.NewNopCloseBuffer()
 	bb2 = gorill.NewNopCloseBuffer()
-	mw = gorill.NewMultiWriteCloser(bb1, bb2) // gorill.NewLockingMultiWriteCloser(bb1, bb2)
+	mw = gorill.NewMultiWriteCloser(bb1, bb2)
 	n, err := mw.Write([]byte("blob"))
 	if want := 4; n != want {
 		t.Errorf("Actual: %#v; Expected: %#v", n, want)
@@ -170,6 +200,16 @@ Instead the test could use `NopCloseBuffer` which simply imbues a no-op `Close` 
     }
 ```
 
+Custom buffer sizes can also be used:
+
+```Go
+    func TestSomething(t *testing.T) {
+        bb := gorill.NopCloseBufferSize(16384)
+        bb.Write([]byte("example"))
+        bb.Close() // does nothing
+    }
+```
+
 ##### ShortWriter
 
 If a test needs an `io.Writer` that simulates write errors, the test could wrap an existing
@@ -189,6 +229,20 @@ and an `io.ErrShortWrite` error.
         n, err := sw.Write([]byte("a somewhat longer write"))
         // n == 16, err == io.ErrShortWrite
     }
+```
+
+##### SlowReader
+
+If a test needs an `io.Reader` that writes all the data to the underlying `io.Reader`, but does slow
+after a delay, the test could wrap an existing `io.Reader` with a `SlowReader`.
+
+```Go
+    bb := gorill.NopCloseBuffer()
+    sr := gorill.SlowReader(bb, 10*time.Second)
+    
+    buf := make([]byte, 1000)
+    n, err := sr.Read(buf) // this call takes at least 10 seconds to return
+    // n == 7, err == nil
 ```
 
 ##### SlowWriter
