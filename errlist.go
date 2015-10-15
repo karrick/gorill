@@ -13,6 +13,11 @@ func (e *ErrList) Append(b error) {
 	}
 }
 
+// Count returns number of non-nil errors accumulated in ErrList.
+func (e ErrList) Count() int {
+	return len([]error(e))
+}
+
 // Err returns either a list of non-nil error values, or a single error value if the list only
 // contains one error.
 func (e ErrList) Err() error {
