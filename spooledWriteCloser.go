@@ -17,14 +17,14 @@ const DefaultFlushPeriod = 15 * time.Second
 // SpooledWriteCloser spools bytes written to it through a bufio.Writer, periodically flushing data
 // written to underlying io.WriteCloser.
 type SpooledWriteCloser struct {
-	bufferSize  int
+	bufSize     int
 	bw          *bufio.Writer
-	bwLock      sync.Mutex
 	flushPeriod time.Duration
 	halted      bool
 	iowc        io.WriteCloser
-	jobs        chan writeJob
+	jobs        chan *rillJob
 	jobsDone    sync.WaitGroup
+	lock        sync.RWMutex
 }
 
 // SpooledWriteCloserSetter is any function that modifies a SpooledWriteCloser being instantiated.
@@ -47,7 +47,7 @@ func BufSize(size int) SpooledWriteCloserSetter {
 		if size <= 0 {
 			return fmt.Errorf("buffer size must be greater than 0: %s", size)
 		}
-		sw.bufferSize = size
+		sw.bufSize = size
 		return nil
 	}
 }
@@ -56,17 +56,17 @@ func BufSize(size int) SpooledWriteCloserSetter {
 // bufio.Writer, periodically forcing the bufio.Writer to flush its contents.
 func NewSpooledWriteCloser(iowc io.WriteCloser, setters ...SpooledWriteCloserSetter) (*SpooledWriteCloser, error) {
 	w := &SpooledWriteCloser{
-		bufferSize:  DefaultBufSize,
+		bufSize:     DefaultBufSize,
 		flushPeriod: DefaultFlushPeriod,
 		iowc:        iowc,
-		jobs:        make(chan writeJob, 1), // buffered to support non-blocking send
+		jobs:        make(chan *rillJob, 1),
 	}
 	for _, setter := range setters {
 		if err := setter(w); err != nil {
 			return nil, err
 		}
 	}
-	w.bw = bufio.NewWriterSize(iowc, w.bufferSize)
+	w.bw = bufio.NewWriterSize(iowc, w.bufSize)
 	w.jobsDone.Add(1)
 	go func() {
 		ticker := time.NewTicker(w.flushPeriod)
@@ -78,12 +78,16 @@ func NewSpooledWriteCloser(iowc io.WriteCloser, setters ...SpooledWriteCloserSet
 				if !more {
 					return
 				}
-				w.bwLock.Lock()
-				n, err := w.bw.Write(job.data)
-				w.bwLock.Unlock()
-				job.results <- writeResult{n, err}
+				switch job.op {
+				case _write:
+					n, err := w.bw.Write(job.data)
+					job.results <- rillResult{n, err}
+				case _flush:
+					err := w.bw.Flush()
+					job.results <- rillResult{0, err}
+				}
 			case <-ticker.C:
-				w.Flush()
+				w.bw.Flush()
 			}
 		}
 	}()
@@ -92,36 +96,47 @@ func NewSpooledWriteCloser(iowc io.WriteCloser, setters ...SpooledWriteCloserSet
 
 // Write spools a byte slice of data to be written to the SpooledWriteCloser.
 func (w *SpooledWriteCloser) Write(data []byte) (int, error) {
+	w.lock.RLock()
+	defer w.lock.RUnlock()
+
 	if w.halted {
 		return 0, ErrWriteAfterClose{}
 	}
-	results := make(chan writeResult)
-	// non-blocking send
-	select {
-	case w.jobs <- writeJob{data: data, results: results}:
-	default:
-	}
+
+	job := newRillJob(_write, data)
+	w.jobs <- job
 	// wait for results
-	result := <-results
+	result := <-job.results
 	return result.n, result.err
 }
 
 // Flush causes all data not yet written to the output stream to be flushed.
 func (w *SpooledWriteCloser) Flush() error {
-	w.bwLock.Lock()
-	defer w.bwLock.Unlock()
-	return w.bw.Flush()
+	w.lock.RLock()
+	defer w.lock.RUnlock()
+
+	if w.halted {
+		return ErrWriteAfterClose{}
+	}
+
+	job := newRillJob(_flush, nil)
+	w.jobs <- job
+	result := <-job.results
+	// wait for results
+	return result.err
 }
 
 // Close frees resources when a SpooledWriteCloser is no longer needed.
 func (w *SpooledWriteCloser) Close() error {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+
 	close(w.jobs)
 	w.jobsDone.Wait()
 	w.halted = true
-	err1 := w.Flush()
-	err2 := w.iowc.Close()
-	if err2 != nil {
-		return err2
-	}
-	return err1
+
+	var errors ErrList
+	errors.Append(w.bw.Flush())
+	errors.Append(w.iowc.Close())
+	return errors.Err()
 }

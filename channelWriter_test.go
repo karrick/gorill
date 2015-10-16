@@ -8,42 +8,51 @@ import (
 
 // channelWriter provided to benchmark against LockingWriter and TimedWriteCloser.
 type channelWriter struct {
-	halted sync.WaitGroup
-	iowc   io.WriteCloser
-	jobs   chan writeJob
+	halted   bool
+	jobsDone sync.WaitGroup
+	iowc     io.WriteCloser
+	jobs     chan rillJob
+	lock     sync.RWMutex
 }
 
 func newChannelWriter(iowc io.WriteCloser) *channelWriter {
 	w := &channelWriter{
 		iowc: iowc,
-		jobs: make(chan writeJob, 1), // buffered to support non-blocking send
+		jobs: make(chan rillJob, 1),
 	}
 	go func(w *channelWriter) {
-		w.halted.Add(1)
+		w.jobsDone.Add(1)
 		for job := range w.jobs {
 			n, err := w.iowc.Write(job.data)
-			job.results <- writeResult{n, err}
+			job.results <- rillResult{n, err}
 		}
-		w.halted.Done()
+		w.jobsDone.Done()
 	}(w)
 	return w
 }
 
 func (w *channelWriter) Write(data []byte) (int, error) {
-	results := make(chan writeResult, 1)
-	// non-blocking send
-	select {
-	case w.jobs <- writeJob{data: data, results: results}:
-	default:
+	w.lock.RLock()
+	defer w.lock.RUnlock()
+
+	if w.halted {
+		return 0, ErrWriteAfterClose{}
 	}
-	// wait for result or timeout
-	result := <-results
+
+	job := rillJob{data: data, results: make(chan rillResult, 1)}
+	w.jobs <- job
+	// wait for result
+	result := <-job.results
 	return result.n, result.err
 }
 
 func (w *channelWriter) Close() error {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+
 	close(w.jobs)
-	w.halted.Wait()
+	w.jobsDone.Wait()
+	w.halted = true
 	return w.iowc.Close()
 }
 

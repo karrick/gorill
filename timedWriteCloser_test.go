@@ -62,7 +62,7 @@ func TestTimedWriteCloserWriteAfterCloseReturnsError(t *testing.T) {
 		t.Errorf("Actual: %#v; Expected: %#v", n, want)
 	}
 	if _, ok := err.(ErrWriteAfterClose); err == nil || !ok {
-		t.Errorf("Actual: %#v; Expected: %#v", n, ErrWriteAfterClose{})
+		t.Errorf("Actual: %s; Expected: %#v", err, ErrWriteAfterClose{})
 	}
 }
 

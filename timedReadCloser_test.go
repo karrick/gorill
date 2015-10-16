@@ -9,9 +9,11 @@ import (
 func TestTimedReadCloser(t *testing.T) {
 	corpus := "this is a test"
 	bb := bytes.NewReader([]byte(corpus))
-	ior := NewTimedReadCloser(NopCloseReader(bb), time.Second)
+	rc := NewTimedReadCloser(NopCloseReader(bb), time.Second)
+	defer rc.Close()
+
 	buf := make([]byte, 1000)
-	n, err := ior.Read(buf)
+	n, err := rc.Read(buf)
 	if actual, want := n, len(corpus); actual != want {
 		t.Errorf("Actual: %#v; Expected: %#v", actual, want)
 	}
@@ -24,12 +26,14 @@ func TestTimedReadCloser(t *testing.T) {
 }
 
 func TestTimedReadCloserTimesOut(t *testing.T) {
-	bb := NewNopCloseBuffer()
-	sr := SlowReader(bb, 10*time.Second)
+	corpus := "this is a test"
+	bb := bytes.NewReader([]byte(corpus))
+	sr := SlowReader(bb, 10*time.Millisecond)
+	rc := NewTimedReadCloser(NopCloseReader(sr), time.Millisecond)
+	defer rc.Close()
 
-	ior := NewTimedReadCloser(NopCloseReader(sr), time.Millisecond)
 	buf := make([]byte, 1000)
-	n, err := ior.Read(buf)
+	n, err := rc.Read(buf)
 	if actual, want := n, 0; actual != want {
 		t.Errorf("Actual: %#v; Expected: %#v", actual, want)
 	}
@@ -38,5 +42,23 @@ func TestTimedReadCloserTimesOut(t *testing.T) {
 	}
 	if actual, want := err, ErrTimeout(time.Millisecond); actual != want {
 		t.Errorf("Actual: %s; Expected: %s", actual, want)
+	}
+}
+
+func TestTimedReadCloserReadAfterCloseReturnsError(t *testing.T) {
+	bb := NewNopCloseBuffer()
+	rc := NewTimedReadCloser(NopCloseReader(bb), time.Millisecond)
+	rc.Close()
+
+	buf := make([]byte, 1000)
+	n, err := rc.Read(buf)
+	if actual, want := n, 0; actual != want {
+		t.Errorf("Actual: %#v; Expected: %#v", actual, want)
+	}
+	if actual, want := string(buf[:n]), ""; actual != want {
+		t.Errorf("Actual: %#v; Expected: %#v", actual, want)
+	}
+	if _, ok := err.(ErrReadAfterClose); err == nil || !ok {
+		t.Errorf("Actual: %s; Expected: %#v", err, ErrReadAfterClose{})
 	}
 }

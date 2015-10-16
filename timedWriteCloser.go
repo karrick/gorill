@@ -20,8 +20,9 @@ func (e ErrTimeout) Error() string {
 type TimedWriteCloser struct {
 	halted   bool
 	iowc     io.WriteCloser
-	jobs     chan writeJob
+	jobs     chan *rillJob
 	jobsDone sync.WaitGroup
+	lock     sync.RWMutex
 	timeout  time.Duration
 }
 
@@ -31,48 +32,52 @@ func NewTimedWriteCloser(iowc io.WriteCloser, timeout time.Duration) *TimedWrite
 	if timeout <= 0 {
 		panic(fmt.Errorf("timeout must be greater than 0: %s", timeout))
 	}
-	w := &TimedWriteCloser{
+	wc := &TimedWriteCloser{
 		iowc:    iowc,
-		jobs:    make(chan writeJob, 1), // buffered to support non-blocking send
+		jobs:    make(chan *rillJob, 1),
 		timeout: timeout,
 	}
-	w.jobsDone.Add(1)
+	wc.jobsDone.Add(1)
 	go func() {
-		for job := range w.jobs {
-			n, err := w.iowc.Write(job.data)
-			job.results <- writeResult{n, err}
+		for job := range wc.jobs {
+			n, err := wc.iowc.Write(job.data)
+			job.results <- rillResult{n, err}
 		}
-		w.jobsDone.Done()
+		wc.jobsDone.Done()
 	}()
-	return w
+	return wc
 }
 
 // Write writes data to the underlying io.Writer, but returns ErrTimeout if the Write
 // operation exceeds a preset timeout duration.  Even after a timeout takes place, the write may
 // still independantly complete as writes are queued from a different go routine.
-func (w *TimedWriteCloser) Write(data []byte) (int, error) {
-	if w.halted {
+func (wc *TimedWriteCloser) Write(data []byte) (int, error) {
+	wc.lock.RLock()
+	defer wc.lock.RUnlock()
+
+	if wc.halted {
 		return 0, ErrWriteAfterClose{}
 	}
-	results := make(chan writeResult, 1)
-	// non-blocking send
-	select {
-	case w.jobs <- writeJob{data: data, results: results}:
-	default:
-	}
+
+	job := newRillJob(_write, data)
+	wc.jobs <- job
+
 	// wait for result or timeout
 	select {
-	case result := <-results:
+	case result := <-job.results:
 		return result.n, result.err
-	case <-time.After(w.timeout):
-		return 0, ErrTimeout(w.timeout)
+	case <-time.After(wc.timeout):
+		return 0, ErrTimeout(wc.timeout)
 	}
 }
 
 // Close frees resources when a SpooledWriteCloser is no longer needed.
-func (w *TimedWriteCloser) Close() error {
-	close(w.jobs)
-	w.jobsDone.Wait()
-	w.halted = true
-	return w.iowc.Close()
+func (wc *TimedWriteCloser) Close() error {
+	wc.lock.Lock()
+	defer wc.lock.Unlock()
+
+	close(wc.jobs)
+	wc.jobsDone.Wait()
+	wc.halted = true
+	return wc.iowc.Close()
 }
