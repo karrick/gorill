@@ -48,19 +48,21 @@ func (mwc *MultiWriteCloserFanOut) update() {
 	}
 }
 
-// Add adds an io.WriteCloser to the list of writers to be written to whenever this MultiWriteCloserFanOut is
-// written to.
+// Add adds an io.WriteCloser to the list of writers to be written to whenever this
+// MultiWriteCloserFanOut is written to.  It returns the number of io.WriteCloser instances attached
+// to the MultiWriteCloserFanOut instance.
 //
 //   bb1 = gorill.NewNopCloseBuffer()
 //   mw = gorill.NewMultiWriteCloserFanOut(bb1)
 //   bb2 = gorill.NewNopCloseBuffer()
 //   mw.Add(bb2)
-func (mwc *MultiWriteCloserFanOut) Add(w io.WriteCloser) {
+func (mwc *MultiWriteCloserFanOut) Add(w io.WriteCloser) int {
 	mwc.lock.Lock()
 	defer mwc.lock.Unlock()
 
 	mwc.writerMap[w] = struct{}{}
 	mwc.update()
+	return len(mwc.writerSlice)
 }
 
 // Close will close the underlying io.WriteCloser, and releases resources.
@@ -73,6 +75,20 @@ func (mwc *MultiWriteCloserFanOut) Close() error {
 		errors.Append(iowc.Close())
 	}
 	return errors.Err()
+}
+
+// Count returns the number of io.WriteCloser instances attached to the MultiWriteCloserFanOut
+// instance.
+//
+//   mw = gorill.NewMultiWriteCloserFanOut()
+//   count := mw.Count() // returns 1
+//   mw.Add(gorill.NewNopCloseBuffer())
+//   count = mw.Count() // returns 2
+func (mwc *MultiWriteCloserFanOut) Count() int {
+	mwc.lock.RLock()
+	defer mwc.lock.RUnlock()
+
+	return len(mwc.writerSlice)
 }
 
 // IsEmpty returns true if and only if there are no writers in the list of writers to be written to.
@@ -88,19 +104,21 @@ func (mwc *MultiWriteCloserFanOut) IsEmpty() bool {
 	return len(mwc.writerSlice) == 0
 }
 
-// Remove removes an io.WriteCloser from the list of writers to be written to whenever this MultiWriteCloserFanOut
-// is written to.
+// Remove removes an io.WriteCloser from the list of writers to be written to whenever this
+// MultiWriteCloserFanOut is written to.  It returns the number of io.WriteCloser instances attached
+// to the MultiWriteCloserFanOut instance.
 //
 //   bb1 = gorill.NewNopCloseBuffer()
 //   bb2 = gorill.NewNopCloseBuffer()
 //   mw = gorill.NewMultiWriteCloserFanOut(bb1, bb2)
-//   mw.Remove(bb1)
-func (mwc *MultiWriteCloserFanOut) Remove(w io.WriteCloser) {
+//   remaining := mw.Remove(bb1) // returns 1
+func (mwc *MultiWriteCloserFanOut) Remove(w io.WriteCloser) int {
 	mwc.lock.Lock()
 	defer mwc.lock.Unlock()
 
 	delete(mwc.writerMap, w)
 	mwc.update()
+	return len(mwc.writerSlice)
 }
 
 // Write writes the data to all the writers in the MultiWriteCloserFanOut.  It removes and invokes Close
@@ -144,7 +162,7 @@ func (mwc *MultiWriteCloserFanOut) Write(data []byte) (int, error) {
 	if len(errored) > 0 {
 		for _, w := range errored {
 			delete(mwc.writerMap, w)
-			w.Close() // ignore Close error, because writer already yielded error
+			w.Close() // BUG might cause bug when client tries to later Close ???
 		}
 		mwc.update()
 	}

@@ -9,8 +9,8 @@ import (
 
 func TestMultiWriteCloserFanOutNoWriteClosers(t *testing.T) {
 	mw := NewMultiWriteCloserFanOut()
-	if want := true; mw.IsEmpty() != want {
-		t.Errorf("Actual: %#v; Expected: %#v", mw.IsEmpty(), want)
+	if want := 0; mw.Count() != want {
+		t.Errorf("Actual: %#v; Expected: %#v", mw.Count(), want)
 	}
 	n, err := mw.Write([]byte("blob"))
 	if want := 4; n != want {
@@ -27,8 +27,8 @@ func TestMultiWriteCloserFanOutNewWriteCloser(t *testing.T) {
 	bb2 := NewNopCloseBuffer()
 	mw := NewMultiWriteCloserFanOut(bb1, bb2)
 
-	if want := false; mw.IsEmpty() != want {
-		t.Errorf("Actual: %#v; Expected: %#v", mw.IsEmpty(), want)
+	if want := 2; mw.Count() != want {
+		t.Errorf("Actual: %#v; Expected: %#v", mw.Count(), want)
 	}
 	n, err := mw.Write([]byte("blob"))
 	if want := 4; n != want {
@@ -50,9 +50,11 @@ func TestMultiWriteCloserFanOutOneWriteCloser(t *testing.T) {
 	mw := NewMultiWriteCloserFanOut()
 
 	bb1 := NewNopCloseBuffer()
-	mw.Add(bb1)
-	if want := false; mw.IsEmpty() != want {
-		t.Errorf("Actual: %#v; Expected: %#v", mw.IsEmpty(), want)
+	if actual, expected := mw.Add(bb1), 1; actual != expected {
+		t.Errorf("Actual: %#v; Expected: %#v", actual, expected)
+	}
+	if want := 1; mw.Count() != want {
+		t.Errorf("Actual: %#v; Expected: %#v", mw.Count(), want)
 	}
 	n, err := mw.Write([]byte("blob"))
 	if want := 4; n != want {
@@ -74,8 +76,8 @@ func TestMultiWriteCloserFanOutTwoWriteClosers(t *testing.T) {
 	mw.Add(bb1)
 	bb2 := NewNopCloseBuffer()
 	mw.Add(bb2)
-	if want := false; mw.IsEmpty() != want {
-		t.Errorf("Actual: %#v; Expected: %#v", mw.IsEmpty(), want)
+	if want := 2; mw.Count() != want {
+		t.Errorf("Actual: %#v; Expected: %#v", mw.Count(), want)
 	}
 	n, err := mw.Write([]byte("blob"))
 	if want := 4; n != want {
@@ -100,9 +102,8 @@ func TestMultiWriteCloserFanOutRemoveWriteCloser(t *testing.T) {
 	mw.Add(bb1)
 	bb2 := NewNopCloseBuffer()
 	mw.Add(bb2)
-	mw.Remove(bb1)
-	if want := false; mw.IsEmpty() != want {
-		t.Errorf("Actual: %#v; Expected: %#v", mw.IsEmpty(), want)
+	if actual, expected := mw.Remove(bb1), 1; actual != expected {
+		t.Errorf("Actual: %#v; Expected: %#v", actual, expected)
 	}
 	n, err := mw.Write([]byte("blob"))
 	if want := 4; n != want {
@@ -117,6 +118,10 @@ func TestMultiWriteCloserFanOutRemoveWriteCloser(t *testing.T) {
 	if want := "blob"; bb2.String() != want {
 		t.Errorf("Actual: %#v; Expected: %#v", bb2.String(), want)
 	}
+	// remove last one, should return true
+	if actual, expected := mw.Remove(bb2), 0; actual != expected {
+		t.Errorf("Actual: %#v; Expected: %#v", actual, expected)
+	}
 	mw.Close()
 }
 
@@ -129,8 +134,8 @@ func TestMultiWriteCloserFanOutRemoveEveryWriteCloser(t *testing.T) {
 	mw.Add(bb2)
 	mw.Remove(bb1)
 	mw.Remove(bb2)
-	if want := true; mw.IsEmpty() != want {
-		t.Errorf("Actual: %#v; Expected: %#v", mw.IsEmpty(), want)
+	if want := 0; mw.Count() != want {
+		t.Errorf("Actual: %#v; Expected: %#v", mw.Count(), want)
 	}
 	n, err := mw.Write([]byte("blob"))
 	if want := 4; n != want {
@@ -191,8 +196,8 @@ func TestMultiWriteCloserFanOutWriteErrorRemovesBadWriteCloser(t *testing.T) {
 		t.Errorf("Actual: %#v; Expected: %#v", ew.IsClosed(), want)
 	}
 	// NOTE: testWriteCloser should have been removed during error write
-	if want := true; mw.IsEmpty() != want {
-		t.Errorf("Actual: %#v; Expected: %#v", mw.IsEmpty(), want)
+	if want := 0; mw.Count() != want {
+		t.Errorf("Actual: %#v; Expected: %#v", mw.Count(), want)
 	}
 	mw.Close()
 }
