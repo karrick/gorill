@@ -12,10 +12,11 @@ Documentation is available via
 One of the strengths of Go's interface system is that it allows easy composability of data types.
 An `io.Writer` is any data structure that exposes the `Write([]byte) (int,error)` method.
 
-If a program has an `io.Writer` but requires one that buffers its output somewhat, the program can
-use the Go standard library `bufio.Writer` to wrap the original `io.Writer`, but provide buffering
-on the data writes.  That works great, but the programmer must be willing to allow the buffer to
-fill before flushing data to the final output stream.
+If a program has an `io.Writer` but requires one that buffers its output somewhat, the program could
+use the Go standard library `bufio.Writer` to wrap the original `io.Writer`, providing buffering on
+the data writes.  That works great, but the programmer must be willing to allow the buffer to
+completely fill before flushing data to the final output stream. Instead, the program could use
+`gorill.SpooledWriteCloser` which buffers writes, but flushes data at a configurable periodicity.
 
 ### Supported Use cases
 
@@ -37,9 +38,9 @@ nothing, then wrap it in a `NopCloseWriter`.
 
 If a program has an `io.Reader` but requires an `io.ReadCloser`, the program can imbue the
 `io.Reader` with a no-op `Close` method.  The resultant structure can be used anywhere an
-`io.ReadCloser` is required.  The Go standard library provides this by calling the
+`io.ReadCloser` is required.  The Go standard library provides this exact functionality by the
 `ioutil.NopCloser(io.Reader) io.ReadCloser` function.  It is also provided by this library for
-symmetry with the `NopCloseWriter` call above.
+symmetry with the `gorill.NopCloseWriter` call above.
 
 ```Go
     iorc := gorill.NopCloseReader(ior)
@@ -47,12 +48,12 @@ symmetry with the `NopCloseWriter` call above.
 ```
 
 Alternatively, if you already have an `io.ReadCloser`, but you want its `Close` method to do
-nothing, then wrap it in a `NopCloseReader`.
+nothing, then wrap it in a `gorill.NopCloseReader`.
 
 ##### SpooledWriteCloser
 
 If a program has an `io.WriteCloser` but requires one that spools its data over perhaps a slow
-network connection, the program can use a `SpooledWriteCloser` to wrap the original
+network connection, the program can use a `gorill.SpooledWriteCloser` to wrap the original
 `io.WriteCloser`, but ensure the data is flushed periodically.
 
 ```Go
@@ -124,8 +125,9 @@ seemlessly handles writes that take too long.
 ## LockingWriteCloser
 
 If a program needs an `io.WriteCloser` that can be concurrently used by more than one go-routine, it
-can use a `LockingWriteCloser`.  Benchmarks show a 3x performance gain by using `sync.Mutex` rather
-than channels for this case.  `LockingWriteCloser` data structures provide this peformance benefit.
+can use a `gorill.LockingWriteCloser`.  Benchmarks show a 3x performance gain by using `sync.Mutex`
+rather than channels for this case.  `gorill.LockingWriteCloser` data structures provide this
+peformance benefit.
 
 ```Go
     lwc := gorill.NewLockingWriteCloser(os.Stdout)
@@ -143,43 +145,43 @@ than channels for this case.  `LockingWriteCloser` data structures provide this 
 
 ##### MultiWriteCloserFanIn
 
-If a program needs to be able to fan in writes from multiple `io.WriteCloser`s to a single
-`io.WriteCloser`, the program can use a `MultiWriteCloserFanIn`.
+If a program needs to be able to fan in writes from multiple `io.WriteCloser` instances to a single
+`io.WriteCloser`, the program can use a `gorill.MultiWriteCloserFanIn`.
 
 ```Go
     func Example(largeBuf []byte) {
-    	bb := NewNopCloseBuffer()
-    	first := NewMultiWriteCloserFanIn(bb)
-    	second := first.Add()
-    	first.Write(largeBuf)
-    	first.Close()
-    	second.Write(largeBuf)
-    	second.Close()
+        bb := gorill.NewNopCloseBuffer()
+        first := gorill.NewMultiWriteCloserFanIn(bb)
+        second := first.Add()
+        first.Write(largeBuf)
+        first.Close()
+        second.Write(largeBuf)
+        second.Close()
     }
 ```
 
 ##### MultiWriteCloserFanOut
 
-If a program needs to be able to fan out writes to multiple `io.WriteCloser`s, the program can use a
-`MultiWriteCloserFanOut`.
+If a program needs to be able to fan out writes to multiple `io.WriteCloser` instances, the program
+can use a `gorill.MultiWriteCloserFanOut`.
 
 ```Go
-	bb1 = gorill.NewNopCloseBuffer()
-	bb2 = gorill.NewNopCloseBuffer()
-	mw = gorill.NewMultiWriteCloser(bb1, bb2)
-	n, err := mw.Write([]byte("blob"))
-	if want := 4; n != want {
-		t.Errorf("Actual: %#v; Expected: %#v", n, want)
-	}
-	if err != nil {
-		t.Errorf("Actual: %#v; Expected: %#v", err, nil)
-	}
-	if want := "blob"; bb1.String() != want {
-		t.Errorf("Actual: %#v; Expected: %#v", bb1.String(), want)
-	}
-	if want := "blob"; bb2.String() != want {
-		t.Errorf("Actual: %#v; Expected: %#v", bb2.String(), want)
-	}
+    bb1 = gorill.NewNopCloseBuffer()
+    bb2 = gorill.NewNopCloseBuffer()
+    mw = gorill.NewMultiWriteCloserFanOut(bb1, bb2)
+    n, err := mw.Write([]byte("blob"))
+    if want := 4; n != want {
+        t.Errorf("Actual: %#v; Expected: %#v", n, want)
+    }
+    if err != nil {
+        t.Errorf("Actual: %#v; Expected: %#v", err, nil)
+    }
+    if want := "blob"; bb1.String() != want {
+        t.Errorf("Actual: %#v; Expected: %#v", bb1.String(), want)
+    }
+    if want := "blob"; bb2.String() != want {
+        t.Errorf("Actual: %#v; Expected: %#v", bb2.String(), want)
+    }
 ```
 
 ### Supported Use cases for Testing
@@ -189,7 +191,7 @@ If a program needs to be able to fan out writes to multiple `io.WriteCloser`s, t
 If a test needs a `bytes.Buffer`, but one that has a `Close` method, the test could simply wrap the
 `bytes.Buffer` structure with `ioutil.NopClose()`, but the resultant data structure would only
 provide an `io.ReadCloser` interface, and not all the other convenient `bytes.Buffer` methods.
-Instead the test could use `NopCloseBuffer` which simply imbues a no-op `Close` method to a
+Instead the test could use `gorill.NopCloseBuffer` which simply imbues a no-op `Close` method to a
 `bytes.Buffer` instance:
 
 ```Go
@@ -213,10 +215,10 @@ Custom buffer sizes can also be used:
 ##### ShortWriter
 
 If a test needs an `io.Writer` that simulates write errors, the test could wrap an existing
-`io.Writer` with a `ShortWriter`.  Writes to the resultant `io.Writer` will work as before, unless
-the length of data to be written exceeds some preset limit.  In this case, only the preset limit
-number of bytes will be written to the underlying `io.Writer`, but the write will return this limit
-and an `io.ErrShortWrite` error.
+`io.Writer` with a `gorill.ShortWriter`.  Writes to the resultant `io.Writer` will work as before,
+unless the length of data to be written exceeds some preset limit.  In this case, only the preset
+limit number of bytes will be written to the underlying `io.Writer`, but the write will return this
+limit and an `io.ErrShortWrite` error.
 
 ```Go
     func TestShortWrites(t *testing.T) {
@@ -224,7 +226,7 @@ and an `io.ErrShortWrite` error.
         sw := gorill.ShortWriter(bb, 16)
 
         n, err := sw.Write([]byte("short write"))
-        // n == 11, err == nil 
+        // n == 11, err == nil
 
         n, err := sw.Write([]byte("a somewhat longer write"))
         // n == 16, err == io.ErrShortWrite
@@ -233,13 +235,13 @@ and an `io.ErrShortWrite` error.
 
 ##### SlowReader
 
-If a test needs an `io.Reader` that writes all the data to the underlying `io.Reader`, but does slow
-after a delay, the test could wrap an existing `io.Reader` with a `SlowReader`.
+If a test needs an `io.Reader` that writes all the data to the underlying `io.Reader`, but does so
+after a delay, the test could wrap an existing `io.Reader` with a `gorill.SlowReader`.
 
 ```Go
     bb := gorill.NopCloseBuffer()
     sr := gorill.SlowReader(bb, 10*time.Second)
-    
+
     buf := make([]byte, 1000)
     n, err := sr.Read(buf) // this call takes at least 10 seconds to return
     // n == 7, err == nil
@@ -247,8 +249,8 @@ after a delay, the test could wrap an existing `io.Reader` with a `SlowReader`.
 
 ##### SlowWriter
 
-If a test needs an `io.Writer` that writes all the data to the underlying `io.Writer`, but does slow
-after a delay, the test could wrap an existing `io.Writer` with a `SlowWriter`.
+If a test needs an `io.Writer` that writes all the data to the underlying `io.Writer`, but does so
+after a delay, the test could wrap an existing `io.Writer` with a `gorill.SlowWriter`.
 
 ```Go
     func TestSlowWrites(t *testing.T) {
