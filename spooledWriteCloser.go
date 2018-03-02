@@ -45,7 +45,7 @@ func Flush(periodicity time.Duration) SpooledWriteCloserSetter {
 func BufSize(size int) SpooledWriteCloserSetter {
 	return func(sw *SpooledWriteCloser) error {
 		if size <= 0 {
-			return fmt.Errorf("buffer size must be greater than 0: %s", size)
+			return fmt.Errorf("buffer size must be greater than 0: %d", size)
 		}
 		sw.bufSize = size
 		return nil
