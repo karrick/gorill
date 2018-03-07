@@ -28,14 +28,14 @@ currently open file handle returns io.EOF, it closes that file handle, and the n
 the following file in the series to be opened and read from. Similar to io.MultiReader.
 
 ```Go
-	var ior io.Reader
-	if flag.NArg() == 0 {
-		ior = os.Stdin
-	} else {
-		ior = &gorill.FilesReader{Pathnames: flag.Args()}
-	}
+    var ior io.Reader
+    if flag.NArg() == 0 {
+        ior = os.Stdin
+    } else {
+        ior = &gorill.FilesReader{Pathnames: flag.Args()}
+    }
 
-	lines := bufio.NewScanner(ior)
+    lines := bufio.NewScanner(ior)
     for lines.Scan() {
         // ...
     }
