@@ -20,6 +20,27 @@ completely fill before flushing data to the final output stream. Instead, the pr
 
 ### Supported Use cases
 
+##### FilesReader
+
+FilesReader is an io.ReadCloser that can be used to read over the contents of all of the files
+specified by pathnames. It only opens a single file handle at a time. When reading from the
+currently open file handle returns io.EOF, it closes that file handle, and the next Read will cause
+the following file in the series to be opened and read from. Similar to io.MultiReader.
+
+```Go
+	var ior io.Reader
+	if flag.NArg() == 0 {
+		ior = os.Stdin
+	} else {
+		ior = &gorill.FilesReader{Pathnames: flag.Args()}
+	}
+
+	lines := bufio.NewScanner(ior)
+    for lines.Scan() {
+        // ...
+    }
+```
+
 ##### NopWriteCloser
 
 If a program has an `io.Writer` but requires an `io.WriteCloser`, the program can imbue the
