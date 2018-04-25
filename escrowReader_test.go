@@ -43,6 +43,15 @@ func TestEscrowReader(t *testing.T) {
 	}
 }
 
+func TestEscrowReaderClosesSource(t *testing.T) {
+	src := NewNopCloseBuffer()
+	_ = NewEscrowReader(src, nil)
+
+	if got, want := src.IsClosed(), true; got != want {
+		t.Errorf("GOT: %v; WANT: %v", got, want)
+	}
+}
+
 func TestEscrowReaderHandlesReadAndCloseErrors(t *testing.T) {
 	const payload = "flubber"
 	const limit = 4
