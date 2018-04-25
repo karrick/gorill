@@ -106,3 +106,90 @@ type errorReadCloser struct {
 func (erc errorReadCloser) Close() error {
 	return erc.err
 }
+
+//
+// WriteTo
+//
+
+func TestEscrowReaderWriteToReturnsWriterError(t *testing.T) {
+	const payload = "flubber"
+
+	src := bytes.NewBuffer([]byte(payload))
+	er := NewEscrowReader(ioutil.NopCloser(src), nil)
+	pr, pw := io.Pipe()
+	_ = pr.Close()
+
+	n, err := er.WriteTo(pw)
+
+	if got, want := n, int64(0); got != want {
+		t.Errorf("GOT: %v; WANT: %v", got, want)
+	}
+	if got, want := err, io.ErrClosedPipe; got != want {
+		t.Errorf("GOT: %v; WANT: %v", got, want)
+	}
+}
+
+// badWriter claims no errors, but writes fewer than requested bytes.
+type badWriter struct{ io.Writer }
+
+func (w *badWriter) Write(p []byte) (int, error) {
+	return w.Writer.Write(p[:len(p)-1])
+}
+
+func TestEscrowReaderWriteToErrShortWrite(t *testing.T) {
+	const payload = "flubber"
+
+	src := bytes.NewBuffer([]byte(payload))
+	er := NewEscrowReader(ioutil.NopCloser(src), nil)
+	dst := new(bytes.Buffer)
+
+	n, err := er.WriteTo(&badWriter{dst})
+
+	if got, want := n, int64(len(payload)-1); got != want {
+		t.Errorf("GOT: %v; WANT: %v", got, want)
+	}
+	if got, want := err, io.ErrShortWrite; got != want {
+		t.Errorf("GOT: %v; WANT: %v", got, want)
+	}
+	if got, want := string(dst.Bytes()), payload[:len(payload)-1]; got != want {
+		t.Errorf("GOT: %v; WANT: %v", got, want)
+	}
+}
+
+func TestEscrowReaderWriteToEmpty(t *testing.T) {
+	src := NewNopCloseBuffer()
+	er := NewEscrowReader(src, nil)
+	dst := new(bytes.Buffer)
+
+	n, err := er.WriteTo(dst)
+
+	if got, want := n, int64(0); got != want {
+		t.Errorf("GOT: %v; WANT: %v", got, want)
+	}
+	if got, want := err, error(nil); got != want {
+		t.Errorf("GOT: %v; WANT: %v", got, want)
+	}
+	if got, want := dst.Len(), 0; got != want {
+		t.Errorf("GOT: %v; WANT: %v", got, want)
+	}
+}
+
+func TestEscrowReaderWriteTo(t *testing.T) {
+	const payload = "flubber"
+
+	src := bytes.NewBuffer([]byte(payload))
+	er := NewEscrowReader(ioutil.NopCloser(src), nil)
+	dst := new(bytes.Buffer)
+
+	n, err := er.WriteTo(dst)
+
+	if got, want := n, int64(len(payload)); got != want {
+		t.Errorf("GOT: %v; WANT: %v", got, want)
+	}
+	if got, want := err, error(nil); got != want {
+		t.Errorf("GOT: %v; WANT: %v", got, want)
+	}
+	if got, want := string(dst.Bytes()), payload; got != want {
+		t.Errorf("GOT: %v; WANT: %v", got, want)
+	}
+}

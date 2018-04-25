@@ -85,3 +85,24 @@ func (er *EscrowReader) Read(b []byte) (int, error) {
 func (er *EscrowReader) Reset() {
 	er.off = 0
 }
+
+// WriteTo writes the entire buffer contents to w, and returns the number of
+// bytes written along with any error.
+func (er *EscrowReader) WriteTo(w io.Writer) (int64, error) {
+	var n int64
+	if len(er.buf) > 0 {
+		nw, err := w.Write(er.buf)
+		n = int64(nw)
+		if err != nil {
+			return n, err
+		}
+		if nw != len(er.buf) {
+			// While io.Writer function is supposed to write all the bytes or
+			// return an error describing why, protect against a misbehaving
+			// writer that writes fewer bytes than requested and returns no
+			// error.
+			return n, io.ErrShortWrite
+		}
+	}
+	return n, nil
+}
