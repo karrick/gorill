@@ -12,7 +12,7 @@ const alphabet = "abcdefghijklmnopqrstuvwxyz\n"
 const consumerCount = 1000
 
 func benchmarkWriter(b *testing.B, n int, consumers []io.WriteCloser) {
-	return // FIXME
+	b.Skip("disabled")
 
 	const producerCount = 10
 
