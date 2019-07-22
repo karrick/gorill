@@ -33,4 +33,9 @@ func TestNewline(t *testing.T) {
 			t.Errorf("GOT: %q; WANT: %q", got, want)
 		}
 	})
+	t.Run("string with multiple embedded newlines", func(t *testing.T) {
+		if got, want := newline("abc\n\ndef\n\n"), "abc\n\ndef\n"; got != want {
+			t.Errorf("GOT: %q; WANT: %q", got, want)
+		}
+	})
 }
