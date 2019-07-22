@@ -1,10 +1,11 @@
 package gorill
 
 // newline returns a string with exactly one terminating newline character.
-// More simple than strings.TrimRight.  When input string has multiple newline
-// characters, it will strip off all but first one, reusing the same underlying
-// string bytes.  When string does not end in a newline character, it returns
-// the original string with a newline character appended.
+// More simple than strings.TrimRight.  When input string ends with multiple
+// newline characters, it will strip off all but first one, reusing the same
+// underlying string bytes.  When string does not end in a newline character, it
+// returns the original string with a newline character appended.  Newline
+// characters before any non-newline characters are ignored.
 func newline(s string) string {
 	l := len(s)
 	if l == 0 {
