@@ -45,6 +45,11 @@ func NewEscrowReader(iorc io.ReadCloser, bb *bytes.Buffer) *EscrowReader {
 		bb = new(bytes.Buffer)
 	}
 	_, rerr := bb.ReadFrom(iorc)
+	if rerr == nil {
+		// Mimic expected behavior of returning io.EOF when there are no bytes
+		// remaining to be read.
+		rerr = io.EOF
+	}
 	cerr := iorc.Close()
 	return &EscrowReader{buf: bb.Bytes(), cerr: cerr, rerr: rerr}
 }
@@ -69,12 +74,7 @@ func (er *EscrowReader) Read(b []byte) (int, error) {
 	if er.off >= int64(len(er.buf)) {
 		// Once everything has been read, any further reads return the error
 		// that was recorded when slurping in the original data source.
-		if er.rerr != nil {
-			return 0, er.rerr
-		}
-		// Mimic expected behavior of returning io.EOF when there are no bytes
-		// remaining to be read.
-		return 0, io.EOF
+		return 0, er.rerr
 	}
 	n := copy(b, er.buf[er.off:])
 	er.off += int64(n)

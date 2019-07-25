@@ -43,6 +43,36 @@ func TestEscrowReader(t *testing.T) {
 	}
 }
 
+func TestEscrowReaderEOF(t *testing.T) {
+	const payload = "flubber"
+
+	original := ioutil.NopCloser(bytes.NewReader([]byte(payload)))
+
+	wrapped := NewEscrowReader(original, nil)
+
+	// Ensure Read and Close returns original errors.
+	buf := make([]byte, len(payload))
+	n, err := wrapped.Read(buf)
+	if got, want := n, len(payload); got != want {
+		t.Errorf("GOT: %v; WANT: %v", got, want)
+	}
+	if got, want := err, error(nil); got != want {
+		t.Errorf("GOT: %v; WANT: %v", got, want)
+	}
+	if got, want := string(buf), payload; got != want {
+		t.Errorf("GOT: %v; WANT: %v", got, want)
+	}
+
+	// Following Read will return 0, io.EOF
+	n, err = wrapped.Read(buf)
+	if got, want := n, 0; got != want {
+		t.Errorf("GOT: %v; WANT: %v", got, want)
+	}
+	if got, want := err, io.EOF; got != want {
+		t.Errorf("GOT: %v; WANT: %v", got, want)
+	}
+}
+
 func TestEscrowReaderClosesSource(t *testing.T) {
 	src := NewNopCloseBuffer()
 	_ = NewEscrowReader(src, nil)
