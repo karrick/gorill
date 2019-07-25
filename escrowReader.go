@@ -93,16 +93,14 @@ func (er *EscrowReader) WriteTo(w io.Writer) (int64, error) {
 	if len(er.buf) > 0 {
 		nw, err := w.Write(er.buf)
 		n = int64(nw)
-		if err != nil {
-			return n, err
-		}
-		if nw != len(er.buf) {
+		if err == nil && nw != len(er.buf) {
 			// While io.Writer function is supposed to write all the bytes or
 			// return an error describing why, protect against a misbehaving
 			// writer that writes fewer bytes than requested and returns no
 			// error.
 			return n, io.ErrShortWrite
 		}
+		return n, err
 	}
 	return n, nil
 }
