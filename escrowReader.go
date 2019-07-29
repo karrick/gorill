@@ -61,6 +61,25 @@ func (er *EscrowReader) Bytes() []byte { return er.buf }
 // io.ReadCloser. Under normal circumstances it will be nil.
 func (er *EscrowReader) Close() error { return er.cerr }
 
+// Err returns the error encountered while reading from the source io.ReadCloser
+// if not io.EOF; otherwise it returns the error encountered while closing it.
+// This method comes in handy when you know you have an EscrowReader, and you
+// want to know whether the entire payload was slurped in.
+//
+//     func example(iorc io.ReadCloser) ([]byte, error) {
+//         if er, ok := iorc.(*gorill.EscrowReader); ok {
+//             return er.Bytes(), er.Err()
+//         }
+//     }
+func (er *EscrowReader) Err() error {
+	// An error encountered while reading has more context than an error
+	// encountered while closing.
+	if er.rerr != io.EOF {
+		return er.rerr
+	}
+	return er.cerr
+}
+
 // Read reads up to len(p) bytes into p. It returns the number of bytes read (0
 // <= n <= len(p)) and any error encountered. Even if Read returns n < len(p),
 // it may use all of p as scratch space during the call.  If some data is
