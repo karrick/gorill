@@ -2,6 +2,7 @@ package gorill
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -94,5 +95,12 @@ func ensureStringSlicesMatch(tb testing.TB, actual, expected []string) {
 		default:
 			panic(fmt.Errorf("key has invalid value: %s: %d", s, v)) // panic because this function is broken
 		}
+	}
+}
+
+func testErrorType(tb testing.TB, got, want error) {
+	tb.Helper()
+	if typeGot, typeWant := reflect.TypeOf(got), reflect.TypeOf(want); typeGot != typeWant {
+		tb.Errorf("GOT: %T; WANT: %T", got, want)
 	}
 }
